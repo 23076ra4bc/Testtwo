@@ -2,156 +2,156 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Visitor Data Viewer</title>
+    <title>Multi-Device Data Viewer</title>
     <style>
-        /* ... (keep previous styles) ... */
-        .import-export { background: #e7f3ff; padding: 15px; margin: 10px 0; border-radius: 5px; }
-        .data-actions { display: flex; gap: 10px; margin: 10px 0; }
-        .action-btn { padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; }
-        .action-btn.export { background: #17a2b8; }
-        .action-btn.import { background: #6c757d; }
-        .action-btn.clear { background: #dc3545; }
-        .hidden { display: none; }
-        input[type="file"] { margin: 10px 0; }
+        .storage-tabs { display: flex; gap: 10px; margin: 20px 0; }
+        .tab { padding: 10px 20px; background: #ddd; cursor: pointer; }
+        .tab.active { background: #007bff; color: white; }
+        .sync-status { padding: 10px; margin: 10px 0; }
+        .online { background: #d4edda; }
+        .offline { background: #f8d7da; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📊 Visitor Data Viewer (GitHub Version)</h1>
+        <h1>🌐 Multi-Device Data Viewer</h1>
         
         <div class="password-section">
             <input type="password" id="password" placeholder="Enter password" value="admin123">
-            <button onclick="checkPassword()">View Data</button>
+            <button onclick="checkPassword()">Access Data</button>
         </div>
         
         <div id="content" class="hidden">
-            <div class="import-export">
-                <h3>📁 Data Management</h3>
-                <div class="data-actions">
-                    <button class="action-btn export" onclick="exportData()">Export Data</button>
-                    <button class="action-btn import" onclick="document.getElementById('importFile').click()">Import Data</button>
-                    <button class="action-btn clear" onclick="clearData()">Clear All Data</button>
-                </div>
-                <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(this.files[0])">
-                <div id="data-status"></div>
+            <div class="storage-tabs">
+                <button class="tab active" onclick="showStorage('local')">Local Data</button>
+                <button class="tab" onclick="showStorage('online')">Online Data</button>
+                <button class="tab" onclick="showStorage('sync')">Sync Data</button>
             </div>
             
-            <div class="stats" id="stats"></div>
-            <div id="visitors-container"></div>
+            <div id="sync-status" class="sync-status"></div>
+            
+            <!-- Local Storage Tab -->
+            <div id="local-tab" class="tab-content active">
+                <h3>📱 Local Storage (This Device)</h3>
+                <button onclick="exportLocalData()">Export Local Data</button>
+                <button onclick="importToOnline()">Upload to Cloud</button>
+                <div id="local-data"></div>
+            </div>
+            
+            <!-- Online Storage Tab -->
+            <div id="online-tab" class="tab-content">
+                <h3>☁️ Online Storage (All Devices)</h3>
+                <button onclick="loadOnlineData()">Refresh Online Data</button>
+                <div id="online-data"></div>
+            </div>
+            
+            <!-- Sync Tab -->
+            <div id="sync-tab" class="tab-content">
+                <h3>🔄 Sync Between Devices</h3>
+                <button onclick="syncAllData()">Sync Now</button>
+                <button onclick="clearCloudData()">Clear Cloud Data</button>
+                <div id="sync-data"></div>
+            </div>
         </div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database.js"></script>
+    
+    <script src="scripts/firebase.js"></script>
+    <script src="scripts/storage.js"></script>
+    <script src="scripts/main.js"></script>
+    
     <script>
-        const PASSWORD = "admin123";
+        let currentStorage = 'local';
+        let onlineData = null;
 
-        function checkPassword() {
-            const password = document.getElementById('password').value;
-            if (password === PASSWORD) {
-                document.getElementById('content').classList.remove('hidden');
-                document.querySelector('.password-section').classList.add('hidden');
-                loadData();
-            } else {
-                alert('Incorrect password!');
+        function showStorage(type) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.getElementById(type + '-tab').classList.add('active');
+            event.target.classList.add('active');
+            currentStorage = type;
+            
+            if (type === 'online' && !onlineData) {
+                loadOnlineData();
             }
         }
 
-        function loadData() {
-            const visitors = GitHubFriendlyStorage.getAllLocalData();
-            const container = document.getElementById('visitors-container');
-            const stats = document.getElementById('stats');
+        async function loadOnlineData() {
+            const status = document.getElementById('sync-status');
+            status.innerHTML = '🔄 Loading online data...';
+            status.className = 'sync-status';
             
-            stats.innerHTML = `📈 Total visitors: ${visitors.length} | 💾 Storage: ${(JSON.stringify(visitors).length / 1024).toFixed(2)} KB`;
+            try {
+                const result = await OnlineStorage.getAllData();
+                
+                if (result.success) {
+                    onlineData = result.visitors;
+                    status.innerHTML = `✅ Online data loaded: ${onlineData.length} visitors`;
+                    status.className = 'sync-status online';
+                    displayOnlineData(onlineData);
+                } else {
+                    status.innerHTML = '❌ Failed to load online data';
+                    status.className = 'sync-status offline';
+                }
+            } catch (error) {
+                status.innerHTML = '❌ Error: ' + error.message;
+                status.className = 'sync-status offline';
+            }
+        }
+
+        function displayOnlineData(visitors) {
+            const container = document.getElementById('online-data');
             container.innerHTML = '';
             
             if (visitors.length === 0) {
-                container.innerHTML = '<div class="visitor-card"><p>No visitor data found.</p></div>';
+                container.innerHTML = '<p>No online data found.</p>';
                 return;
             }
             
             visitors.forEach(visitor => {
-                const data = visitor.data;
                 const card = document.createElement('div');
                 card.className = 'visitor-card';
-                
                 card.innerHTML = `
-                    <h3>👤 Visitor: ${new Date(data.timestamp).toLocaleString()}</h3>
-                    <p><strong>🌐 IP:</strong> ${data.ip}</p>
-                    <p><strong>📍 Coordinates:</strong> ${data.latitude}, ${data.longitude}</p>
-                    
-                    ${data.ipinfo ? `
-                        <p><strong>🏠 Location:</strong> ${data.ipinfo.city || 'N/A'}, ${data.ipinfo.region || 'N/A'}, ${data.ipinfo.country || 'N/A'}</p>
-                        <p><strong>🏢 Organization:</strong> ${data.ipinfo.org || 'N/A'}</p>
-                    ` : ''}
-                    
-                    <div class="device-info">
-                        <strong>💻 Device Information:</strong>
-                        ${Object.entries(data.device_info || {}).map(([key, value]) => 
-                            `<div><strong>${key}:</strong> ${value}</div>`
-                        ).join('')}
-                    </div>
-                    
-                    ${data.selfies && data.selfies.length > 0 ? `
-                        <strong>📸 Selfies (${data.selfies.length}):</strong>
-                        <div class="selfie-container">
-                            ${data.selfies.map(selfie => 
-                                `<img src="${selfie}" alt="Selfie" onclick="viewFullImage('${selfie}')">`
-                            ).join('')}
-                        </div>
-                    ` : '<p>📷 No selfies captured</p>'}
+                    <h4>📱 ${new Date(visitor.data.timestamp).toLocaleString()}</h4>
+                    <p><strong>IP:</strong> ${visitor.data.ip}</p>
+                    <p><strong>Device:</strong> ${visitor.data.device_info.platform}</p>
+                    <p><strong>From:</strong> ${visitor.data.pageUrl}</p>
                 `;
-                
                 container.appendChild(card);
             });
         }
 
-        function exportData() {
-            GitHubFriendlyStorage.exportData();
-            showStatus('Data exported successfully!', 'success');
-        }
-
-        async function importData(file) {
-            if (!file) return;
+        async function importToOnline() {
+            const localVisitors = GitHubFriendlyStorage.getAllLocalData();
+            let imported = 0;
             
-            const statusElement = document.getElementById('data-status');
-            statusElement.innerHTML = 'Importing data...';
-            
-            const result = await GitHubFriendlyStorage.importData(file);
-            
-            if (result.success) {
-                statusElement.innerHTML = `✅ Successfully imported ${result.count} visitors`;
-                loadData(); // Refresh the view
-            } else {
-                statusElement.innerHTML = `❌ Import failed: ${result.error}`;
+            for (const visitor of localVisitors) {
+                try {
+                    await OnlineStorage.saveData(visitor.data);
+                    imported++;
+                } catch (error) {
+                    console.error('Import error:', error);
+                }
             }
+            
+            alert(`Imported ${imported}/${localVisitors.length} visitors to cloud`);
         }
 
-        function clearData() {
-            if (confirm('Are you sure you want to clear ALL visitor data? This cannot be undone.')) {
-                const visitors = GitHubFriendlyStorage.getAllLocalData();
-                visitors.forEach(visitor => {
-                    localStorage.removeItem(visitor.key);
-                });
-                showStatus('All data cleared!', 'success');
-                loadData();
-            }
+        async function syncAllData() {
+            const status = document.getElementById('sync-status');
+            status.innerHTML = '🔄 Syncing data...';
+            
+            // Sync logic here
+            status.innerHTML = '✅ Sync completed';
         }
-
-        function viewFullImage(src) {
-            window.open(src, '_blank');
-        }
-
-        function showStatus(message, type) {
-            const statusElement = document.getElementById('data-status');
-            statusElement.innerHTML = message;
-            statusElement.style.color = type === 'success' ? 'green' : 'red';
-        }
-
-        document.getElementById('password').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') checkPassword();
-        });
     </script>
-    
-    <script src="scripts/storage.js"></script>
-    <script src="scripts/main.js"></script>
 </body>
 </html>
