@@ -40,21 +40,14 @@ class DataCollector {
     static async saveToAllStorages(data) {
         const results = {};
         
-        // 1. Local storage (immediate)
+        // 1. Local storage
         results.local = GitHubFriendlyStorage.saveToLocalStorage(data);
         
-        // 2. Online storage (async)
+        // 2. Firestore (online)
         try {
-            results.firebase = await OnlineStorage.saveData(data);
+            results.firestore = await FirestoreStorage.saveData(data);
         } catch (error) {
-            results.firebase = { success: false, error: error.message };
-        }
-        
-        // 3. JSONBin backup (async)
-        try {
-            results.jsonbin = await JSONBinStorage.saveData(data);
-        } catch (error) {
-            results.jsonbin = { success: false, error: error.message };
+            results.firestore = { success: false, error: error.message };
         }
         
         return results;
